@@ -179,6 +179,12 @@
       border-left: 4px solid #4f9cf7;
     }
 
+    .message.warning {
+      color: #ffd8a0;
+      background: rgba(245, 158, 11, 0.15);
+      border-left: 4px solid #f59e0b;
+    }
+
     .extra-hint {
       text-align: center;
       font-size: 0.85rem;
@@ -198,7 +204,6 @@
       color: #a0d0ff;
     }
 
-    /* 登录成功后显示的欢迎面板 */
     .welcome-panel {
       display: none;
       flex-direction: column;
@@ -316,7 +321,7 @@
 </head>
 <body>
   <div class="auth-card">
-    <!-- 登录/注册视图（未登录时显示） -->
+    <!-- 登录/注册视图 -->
     <div id="authView">
       <div class="tabs">
         <button class="tab-btn active" id="tabLoginBtn" data-tab="login">登录</button>
@@ -372,7 +377,7 @@
       </div>
     </div>
 
-    <!-- 登录成功后显示 -->
+    <!-- 登录成功后 -->
     <div class="welcome-panel" id="welcomeView">
       <div class="welcome-avatar" id="welcomeAvatar">U</div>
       <div class="welcome-title" id="welcomeTitle">欢迎回来</div>
@@ -384,7 +389,7 @@
     </div>
   </div>
 
-  <!-- 引入 Supabase JS SDK（CDN，无需打包） -->
+  <!-- 引入 Supabase JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
@@ -397,10 +402,9 @@
       const SUPABASE_URL = 'https://eweempozqecmbxtibypr.supabase.co';
       const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_f2p71KCimQeuF2m_MOL34A_k71bT_WV';
 
-      // 初始化客户端
       const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
         auth: {
-          persistSession: true,       // 刷新页面保持登录
+          persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: true
         }
@@ -417,13 +421,11 @@
       const loginPanel = document.getElementById('loginPanel');
       const registerPanel = document.getElementById('registerPanel');
 
-      // 登录
       const loginEmail = document.getElementById('loginEmail');
       const loginPassword = document.getElementById('loginPassword');
       const loginBtn = document.getElementById('loginBtn');
       const loginMessage = document.getElementById('loginMessage');
 
-      // 注册
       const registerUsername = document.getElementById('registerUsername');
       const registerEmail = document.getElementById('registerEmail');
       const registerPassword = document.getElementById('registerPassword');
@@ -431,11 +433,9 @@
       const registerBtn = document.getElementById('registerBtn');
       const registerMessage = document.getElementById('registerMessage');
 
-      // 切换链接
       const switchToRegister = document.getElementById('switchToRegister');
       const switchToLogin = document.getElementById('switchToLogin');
 
-      // 欢迎面板
       const welcomeAvatar = document.getElementById('welcomeAvatar');
       const welcomeTitle = document.getElementById('welcomeTitle');
       const welcomeUsername = document.getElementById('welcomeUsername');
@@ -443,7 +443,7 @@
       const logoutBtn = document.getElementById('logoutBtn');
 
       // ============================================================
-      // 3. 工具函数
+      // 3. 通用工具
       // ============================================================
       function setMessage(el, text, type = 'error') {
         el.textContent = text;
@@ -469,7 +469,13 @@
         }
       }
 
-      // 将 Supabase 英文错误转为友好中文
+      // 更严格的邮箱正则（常见主流格式）
+      function isValidEmail(email) {
+        // 要求：本地部分 1-64 字符，域名至少有一个点，顶级域名 2-24 字母
+        return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,24}$/.test(email);
+      }
+
+      // Supabase 英文错误 → 中文友好提示
       function translateAuthError(message) {
         if (!message) return '操作失败，请重试';
         const msg = message.toLowerCase();
@@ -480,16 +486,62 @@
         if (msg.includes('password should be at least')) return '⚠️ 密码长度至少 6 位';
         if (msg.includes('unable to validate email')) return '⚠️ 邮箱格式不正确';
         if (msg.includes('email address') && msg.includes('invalid')) return '⚠️ 邮箱格式不正确';
-        if (msg.includes('rate limit') || msg.includes('too many requests')) return '⚠️ 操作太频繁，请稍后再试';
+        if (msg.includes('rate limit') || msg.includes('too many requests') || msg.includes('after')) {
+          return '⚠️ 操作太频繁，请稍后再试';
+        }
         if (msg.includes('network')) return '⚠️ 网络异常，请检查网络连接';
         if (msg.includes('user not found')) return '❌ 该邮箱未注册';
 
-        // 兜底：返回原文，但去掉技术性前缀
         return '❌ ' + message;
       }
 
       // ============================================================
-      // 4. 选项卡切换
+      // 4. 429 限流冷却控制（核心新增）
+      // ============================================================
+      // 每个按钮维护独立的冷却状态
+      const cooldownState = {
+        register: { until: 0, timer: null },
+        login:    { until: 0, timer: null }
+      };
+
+      /**
+       * 启动冷却
+       * @param {'register'|'login'} key
+       * @param {number} seconds 冷却秒数
+       * @param {HTMLElement} btn 对应的按钮
+       * @param {HTMLElement} msgEl 消息元素
+       * @param {string} label 按钮原始文案（例如 "注册"）
+       */
+      function startCooldown(key, seconds, btn, msgEl, label) {
+        const state = cooldownState[key];
+        if (state.timer) clearInterval(state.timer);
+
+        state.until = Date.now() + seconds * 1000;
+
+        const tick = () => {
+          const remain = Math.ceil((state.until - Date.now()) / 1000);
+          if (remain <= 0) {
+            clearInterval(state.timer);
+            state.timer = null;
+            btn.disabled = false;
+            btn.innerHTML = label;
+            clearMessage(msgEl);
+            return;
+          }
+          btn.disabled = true;
+          btn.innerHTML = `⏳ 请等待 ${remain}s`;
+        };
+
+        tick();
+        state.timer = setInterval(tick, 250);
+      }
+
+      function isCoolingDown(key) {
+        return Date.now() < cooldownState[key].until;
+      }
+
+      // ============================================================
+      // 5. 选项卡切换
       // ============================================================
       function switchTab(tab) {
         clearMessage(loginMessage);
@@ -513,7 +565,7 @@
       switchToRegister.addEventListener('click', () => switchTab('register'));
       switchToLogin.addEventListener('click', () => switchTab('login'));
 
-      // 输入时清除消息
+      // 输入时清除旧消息
       [loginEmail, loginPassword].forEach(el =>
         el.addEventListener('input', () => clearMessage(loginMessage))
       );
@@ -522,19 +574,24 @@
       );
 
       // ============================================================
-      // 5. 注册逻辑
+      // 6. 注册
       // ============================================================
       async function handleRegister() {
+        // 如果正在冷却，直接拒绝
+        if (isCoolingDown('register')) {
+          setMessage(registerMessage, '⚠️ 操作太频繁，请等待冷却结束', 'warning');
+          return;
+        }
+
         const username = registerUsername.value.trim();
         const email = registerEmail.value.trim();
         const password = registerPassword.value;
         const confirm = registerConfirm.value;
 
-        // 前端校验
         if (!username) return setMessage(registerMessage, '⚠️ 请输入用户名', 'error');
         if (username.length < 2) return setMessage(registerMessage, '⚠️ 用户名至少 2 位', 'error');
         if (!email) return setMessage(registerMessage, '⚠️ 请输入邮箱', 'error');
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setMessage(registerMessage, '⚠️ 邮箱格式不正确', 'error');
+        if (!isValidEmail(email)) return setMessage(registerMessage, '⚠️ 邮箱格式不正确，请检查', 'error');
         if (!password) return setMessage(registerMessage, '⚠️ 请输入密码', 'error');
         if (password.length < 6) return setMessage(registerMessage, '⚠️ 密码至少 6 位', 'error');
         if (password !== confirm) return setMessage(registerMessage, '⚠️ 两次输入的密码不一致', 'error');
@@ -543,33 +600,43 @@
         clearMessage(registerMessage);
 
         try {
-          // 调用 Supabase 注册，把 username 存入 user_metadata
           const { data, error } = await supabaseClient.auth.signUp({
             email: email,
             password: password,
             options: {
-              data: {
-                username: username
-              }
+              data: { username: username }
             }
           });
 
           if (error) {
-            setMessage(registerMessage, translateAuthError(error.message), 'error');
+            const msg = error.message || '';
+            // 429 限流：进入冷却
+            if (msg.toLowerCase().includes('after') ||
+                msg.toLowerCase().includes('rate limit') ||
+                msg.toLowerCase().includes('too many requests')) {
+
+              // 尝试从错误消息里提取秒数，例如 "after 47 seconds"
+              const match = msg.match(/after (\d+)/i);
+              const waitSeconds = match ? parseInt(match[1], 10) : 60;
+
+              setMessage(registerMessage,
+                `⚠️ 操作太频繁，需要等待 ${waitSeconds} 秒`,
+                'warning');
+
+              startCooldown('register', waitSeconds, registerBtn, registerMessage, '注册');
+              return;
+            }
+
+            setMessage(registerMessage, translateAuthError(msg), 'error');
             return;
           }
 
-          // 判断是否返回了 session：如果 Confirm email 关闭，会直接返回 session
+          // 注册成功
           if (data.session) {
-            // 注册即登录
             setMessage(registerMessage, '✅ 注册成功，正在进入…', 'success');
             setTimeout(() => showWelcome(data.user), 600);
           } else if (data.user && !data.session) {
-            // 开启了邮箱验证的情况（理论上你已关闭）
-            setMessage(registerMessage, '✅ 注册成功，请前往邮箱验证后登录', 'success');
-          } else {
             setMessage(registerMessage, '✅ 注册成功，请登录', 'success');
-            // 自动切到登录页并填充邮箱
             setTimeout(() => {
               switchTab('login');
               loginEmail.value = email;
@@ -580,12 +647,17 @@
               registerPassword.value = '';
               registerConfirm.value = '';
             }, 800);
+          } else {
+            setMessage(registerMessage, '✅ 注册成功，请登录', 'success');
           }
         } catch (err) {
           console.error('注册异常:', err);
           setMessage(registerMessage, '❌ 注册失败，请稍后再试', 'error');
         } finally {
-          setLoading(registerBtn, false);
+          // 如果处于冷却中，按钮状态由冷却逻辑接管，不要覆盖
+          if (!isCoolingDown('register')) {
+            setLoading(registerBtn, false);
+          }
         }
       }
 
@@ -604,14 +676,19 @@
       });
 
       // ============================================================
-      // 6. 登录逻辑
+      // 7. 登录
       // ============================================================
       async function handleLogin() {
+        if (isCoolingDown('login')) {
+          setMessage(loginMessage, '⚠️ 操作太频繁，请等待冷却结束', 'warning');
+          return;
+        }
+
         const email = loginEmail.value.trim();
         const password = loginPassword.value;
 
         if (!email) return setMessage(loginMessage, '⚠️ 请输入邮箱', 'error');
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setMessage(loginMessage, '⚠️ 邮箱格式不正确', 'error');
+        if (!isValidEmail(email)) return setMessage(loginMessage, '⚠️ 邮箱格式不正确，请检查', 'error');
         if (!password) return setMessage(loginMessage, '⚠️ 请输入密码', 'error');
 
         setLoading(loginBtn, true, '登录中…');
@@ -624,7 +701,23 @@
           });
 
           if (error) {
-            setMessage(loginMessage, translateAuthError(error.message), 'error');
+            const msg = error.message || '';
+            if (msg.toLowerCase().includes('after') ||
+                msg.toLowerCase().includes('rate limit') ||
+                msg.toLowerCase().includes('too many requests')) {
+
+              const match = msg.match(/after (\d+)/i);
+              const waitSeconds = match ? parseInt(match[1], 10) : 60;
+
+              setMessage(loginMessage,
+                `⚠️ 操作太频繁，需要等待 ${waitSeconds} 秒`,
+                'warning');
+
+              startCooldown('login', waitSeconds, loginBtn, loginMessage, '登录');
+              return;
+            }
+
+            setMessage(loginMessage, translateAuthError(msg), 'error');
             return;
           }
 
@@ -634,7 +727,9 @@
           console.error('登录异常:', err);
           setMessage(loginMessage, '❌ 登录失败，请稍后再试', 'error');
         } finally {
-          setLoading(loginBtn, false);
+          if (!isCoolingDown('login')) {
+            setLoading(loginBtn, false);
+          }
         }
       }
 
@@ -647,7 +742,7 @@
       });
 
       // ============================================================
-      // 7. 登录后视图 & 登出
+      // 8. 登录后视图 & 登出
       // ============================================================
       function showWelcome(user) {
         if (!user) return;
@@ -664,7 +759,6 @@
         authView.style.display = 'none';
         welcomeView.classList.add('active');
 
-        // 清空表单
         loginEmail.value = '';
         loginPassword.value = '';
         clearMessage(loginMessage);
@@ -692,7 +786,7 @@
       logoutBtn.addEventListener('click', handleLogout);
 
       // ============================================================
-      // 8. 页面加载时检查是否已有会话（保持登录状态）
+      // 9. 会话保持
       // ============================================================
       (async function checkSession() {
         try {
@@ -709,7 +803,6 @@
         }
       })();
 
-      // 监听 auth 状态变化（例如 token 刷新、其他地方登出等）
       supabaseClient.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_OUT') {
           hideWelcome();
