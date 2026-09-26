@@ -173,12 +173,6 @@
       border-left: 4px solid #4ade80;
     }
 
-    .message.info {
-      color: #a8d0ff;
-      background: rgba(79, 156, 247, 0.15);
-      border-left: 4px solid #4f9cf7;
-    }
-
     .message.warning {
       color: #ffd8a0;
       background: rgba(245, 158, 11, 0.15);
@@ -267,7 +261,7 @@
       border-color: rgba(248, 113, 113, 0.5);
     }
 
-    /* ⚠️ 注销账号按钮 */
+    /* 注销账号按钮 */
     .btn-delete {
       background: rgba(220, 38, 38, 0.15);
       border: 1px solid rgba(248, 113, 113, 0.4);
@@ -295,7 +289,7 @@
       cursor: not-allowed;
     }
 
-    /* ========== 自定义确认弹窗 ========== */
+    /* 自定义确认弹窗 */
     .confirm-overlay {
       position: fixed;
       inset: 0;
@@ -526,9 +520,6 @@
     (function () {
       'use strict';
 
-      // ============================================================
-      // 1. Supabase 配置
-      // ============================================================
       const SUPABASE_URL = 'https://eweempozqecmbxtibypr.supabase.co';
       const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_f2p71KCimQeuF2m_MOL34A_k71bT_WV';
 
@@ -540,9 +531,6 @@
         }
       });
 
-      // ============================================================
-      // 2. DOM 元素
-      // ============================================================
       const authView = document.getElementById('authView');
       const welcomeView = document.getElementById('welcomeView');
 
@@ -577,9 +565,6 @@
       const confirmCancel = document.getElementById('confirmCancel');
       const confirmDelete = document.getElementById('confirmDelete');
 
-      // ============================================================
-      // 3. 通用工具
-      // ============================================================
       function setMessage(el, text, type = 'error') {
         el.textContent = text;
         el.className = 'message';
@@ -627,9 +612,6 @@
         return '❌ ' + message;
       }
 
-      // ============================================================
-      // 4. 429 限流冷却控制
-      // ============================================================
       const cooldownState = {
         register: { until: 0, timer: null },
         login:    { until: 0, timer: null }
@@ -662,9 +644,6 @@
         return Date.now() < cooldownState[key].until;
       }
 
-      // ============================================================
-      // 5. 选项卡切换
-      // ============================================================
       function switchTab(tab) {
         clearMessage(loginMessage);
         clearMessage(registerMessage);
@@ -694,9 +673,6 @@
         el.addEventListener('input', () => clearMessage(registerMessage))
       );
 
-      // ============================================================
-      // 6. 注册
-      // ============================================================
       async function handleRegister() {
         if (isCoolingDown('register')) {
           setMessage(registerMessage, '⚠️ 操作太频繁，请等待冷却结束', 'warning');
@@ -787,9 +763,6 @@
         if (e.key === 'Enter') { e.preventDefault(); registerConfirm.focus(); }
       });
 
-      // ============================================================
-      // 7. 登录
-      // ============================================================
       async function handleLogin() {
         if (isCoolingDown('login')) {
           setMessage(loginMessage, '⚠️ 操作太频繁，请等待冷却结束', 'warning');
@@ -849,9 +822,6 @@
         if (e.key === 'Enter') { e.preventDefault(); loginPassword.focus(); }
       });
 
-      // ============================================================
-      // 8. 登录后视图 & 登出
-      // ============================================================
       function showWelcome(user) {
         if (!user) return;
 
@@ -893,9 +863,6 @@
 
       logoutBtn.addEventListener('click', handleLogout);
 
-      // ============================================================
-      // 9. 注销账号（永久删除）- 自定义确认弹窗
-      // ============================================================
       function openConfirmDialog() {
         confirmOverlay.classList.add('show');
       }
@@ -963,8 +930,30 @@
       confirmDelete.addEventListener('click', doDeleteAccount);
       deleteAccountBtn.addEventListener('click', openConfirmDialog);
 
-      // ============================================================
-      // 10. 会话保持
-      // ============================================================
       (async function checkSession() {
-        try
+        try {
+          const { data, error } = await supabaseClient.auth.getSession();
+          if (error) {
+            console.warn('获取会话失败:', error.message);
+            return;
+          }
+          if (data && data.session && data.session.user) {
+            showWelcome(data.session.user);
+          }
+        } catch (err) {
+          console.error('检查会话异常:', err);
+        }
+      })();
+
+      supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT') {
+          hideWelcome();
+        } else if (event === 'SIGNED_IN' && session && session.user) {
+          showWelcome(session.user);
+        }
+      });
+
+    })();
+  </script>
+</body>
+</html>
