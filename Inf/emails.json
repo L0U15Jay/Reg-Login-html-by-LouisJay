@@ -1,15 +1,17 @@
 {
   "domains": [
     "gmail.com",
-    "googlemail.com",
     "outlook.com",
+    "mac.com",
+    "qq.com"
+    "163.com"
     "hotmail.com",
     "live.com",
     "msn.com",
     "yahoo.com",
     "icloud.com",
+    "googlemail.com",
     "me.com",
-    "mac.com",
     "aol.com",
     "zoho.com",
     "protonmail.com",
@@ -19,8 +21,6 @@
     "mail.com",
     "yandex.com",
     
-    "qq.com",
-    "163.com",
     "126.com",
     "yeah.net",
     "foxmail.com",

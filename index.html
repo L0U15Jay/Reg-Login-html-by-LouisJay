@@ -627,7 +627,7 @@
           // 过滤：域名以 typed 开头的
           var matches = ALLOWED_DOMAINS.filter(function (d) {
             return d.indexOf(typed) === 0;
-          }).slice(0, 8);
+          }).slice(0, 5);
 
           if (matches.length === 0) {
             panel.classList.remove('show');
