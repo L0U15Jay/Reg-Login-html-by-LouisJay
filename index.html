@@ -267,6 +267,29 @@
       border-color: rgba(248, 113, 113, 0.5);
     }
 
+    /* ⚠️ 新增：注销账号按钮样式 */
+    .btn-delete {
+      background: rgba(220, 38, 38, 0.15);
+      border: 1px solid rgba(248, 113, 113, 0.4);
+      color: #ff8a8a;
+      padding: 0.75rem 1.5rem;
+      border-radius: 2rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.15s ease;
+      margin-top: 0.3rem;
+    }
+    .btn-delete:hover:not(:disabled) {
+      background: rgba(220, 38, 38, 0.3);
+      border-color: rgba(248, 113, 113, 0.7);
+      color: #ffb0b0;
+    }
+    .btn-delete:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .cloud-note {
       margin-top: 2rem;
       border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -276,16 +299,6 @@
       text-align: center;
       line-height: 1.6;
       letter-spacing: 0.2px;
-    }
-
-    .cloud-note code {
-      background: rgba(0, 0, 0, 0.5);
-      padding: 0.15rem 0.6rem;
-      border-radius: 1rem;
-      font-family: 'SF Mono', monospace;
-      font-size: 0.7rem;
-      color: #b0d0ff;
-      border: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     .badge-cloud {
@@ -386,6 +399,7 @@
         邮箱：<strong id="welcomeEmail">—</strong>
       </div>
       <button class="btn-logout" id="logoutBtn">退出登录</button>
+      <button class="btn-delete" id="deleteAccountBtn">⚠️ 永久注销账号</button>
     </div>
   </div>
 
@@ -441,6 +455,7 @@
       const welcomeUsername = document.getElementById('welcomeUsername');
       const welcomeEmail = document.getElementById('welcomeEmail');
       const logoutBtn = document.getElementById('logoutBtn');
+      const deleteAccountBtn = document.getElementById('deleteAccountBtn');
 
       // ============================================================
       // 3. 通用工具
@@ -469,13 +484,10 @@
         }
       }
 
-      // 更严格的邮箱正则（常见主流格式）
       function isValidEmail(email) {
-        // 要求：本地部分 1-64 字符，域名至少有一个点，顶级域名 2-24 字母
         return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,24}$/.test(email);
       }
 
-      // Supabase 英文错误 → 中文友好提示
       function translateAuthError(message) {
         if (!message) return '操作失败，请重试';
         const msg = message.toLowerCase();
@@ -496,26 +508,16 @@
       }
 
       // ============================================================
-      // 4. 429 限流冷却控制（核心新增）
+      // 4. 429 限流冷却控制
       // ============================================================
-      // 每个按钮维护独立的冷却状态
       const cooldownState = {
         register: { until: 0, timer: null },
         login:    { until: 0, timer: null }
       };
 
-      /**
-       * 启动冷却
-       * @param {'register'|'login'} key
-       * @param {number} seconds 冷却秒数
-       * @param {HTMLElement} btn 对应的按钮
-       * @param {HTMLElement} msgEl 消息元素
-       * @param {string} label 按钮原始文案（例如 "注册"）
-       */
       function startCooldown(key, seconds, btn, msgEl, label) {
         const state = cooldownState[key];
         if (state.timer) clearInterval(state.timer);
-
         state.until = Date.now() + seconds * 1000;
 
         const tick = () => {
@@ -565,7 +567,6 @@
       switchToRegister.addEventListener('click', () => switchTab('register'));
       switchToLogin.addEventListener('click', () => switchTab('login'));
 
-      // 输入时清除旧消息
       [loginEmail, loginPassword].forEach(el =>
         el.addEventListener('input', () => clearMessage(loginMessage))
       );
@@ -577,7 +578,6 @@
       // 6. 注册
       // ============================================================
       async function handleRegister() {
-        // 如果正在冷却，直接拒绝
         if (isCoolingDown('register')) {
           setMessage(registerMessage, '⚠️ 操作太频繁，请等待冷却结束', 'warning');
           return;
@@ -610,28 +610,21 @@
 
           if (error) {
             const msg = error.message || '';
-            // 429 限流：进入冷却
             if (msg.toLowerCase().includes('after') ||
                 msg.toLowerCase().includes('rate limit') ||
                 msg.toLowerCase().includes('too many requests')) {
-
-              // 尝试从错误消息里提取秒数，例如 "after 47 seconds"
               const match = msg.match(/after (\d+)/i);
               const waitSeconds = match ? parseInt(match[1], 10) : 60;
-
               setMessage(registerMessage,
                 `⚠️ 操作太频繁，需要等待 ${waitSeconds} 秒`,
                 'warning');
-
               startCooldown('register', waitSeconds, registerBtn, registerMessage, '注册');
               return;
             }
-
             setMessage(registerMessage, translateAuthError(msg), 'error');
             return;
           }
 
-          // 注册成功
           if (data.session) {
             setMessage(registerMessage, '✅ 注册成功，正在进入…', 'success');
             setTimeout(() => showWelcome(data.user), 600);
@@ -654,7 +647,6 @@
           console.error('注册异常:', err);
           setMessage(registerMessage, '❌ 注册失败，请稍后再试', 'error');
         } finally {
-          // 如果处于冷却中，按钮状态由冷却逻辑接管，不要覆盖
           if (!isCoolingDown('register')) {
             setLoading(registerBtn, false);
           }
@@ -705,18 +697,14 @@
             if (msg.toLowerCase().includes('after') ||
                 msg.toLowerCase().includes('rate limit') ||
                 msg.toLowerCase().includes('too many requests')) {
-
               const match = msg.match(/after (\d+)/i);
               const waitSeconds = match ? parseInt(match[1], 10) : 60;
-
               setMessage(loginMessage,
                 `⚠️ 操作太频繁，需要等待 ${waitSeconds} 秒`,
                 'warning');
-
               startCooldown('login', waitSeconds, loginBtn, loginMessage, '登录');
               return;
             }
-
             setMessage(loginMessage, translateAuthError(msg), 'error');
             return;
           }
@@ -786,7 +774,65 @@
       logoutBtn.addEventListener('click', handleLogout);
 
       // ============================================================
-      // 9. 会话保持
+      // 9. 注销账号（永久删除）
+      // ============================================================
+      async function handleDeleteAccount() {
+        const confirmed = confirm(
+          '⚠️ 警告：确定要永久删除账号吗？\n\n' +
+          '此操作不可撤销。你的邮箱将被释放，之后可以用同一邮箱重新注册。\n\n' +
+          '点击"确定"立即删除，点击"取消"放弃。'
+        );
+        if (!confirmed) return;
+
+        setLoading(deleteAccountBtn, true, '注销中…');
+
+        try {
+          // 1. 拿到当前会话的 access_token
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          if (!session) {
+            alert('会话已过期，请重新登录');
+            hideWelcome();
+            return;
+          }
+
+          // 2. 调用 Edge Function 删除用户
+          const response = await fetch(
+            `${SUPABASE_URL}/functions/v1/delete-user`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'apikey': SUPABASE_PUBLISHABLE_KEY,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          const result = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            console.error('删除失败:', result);
+            alert('删除失败：' + (result.error || `HTTP ${response.status}`));
+            setLoading(deleteAccountBtn, false);
+            return;
+          }
+
+          // 3. 删除成功 → 登出 → 回到登录页
+          alert('✅ 账号已永久删除\n\n你的邮箱现在可以重新注册了。');
+          await supabaseClient.auth.signOut();
+          hideWelcome();
+        } catch (err) {
+          console.error('注销异常:', err);
+          alert('注销失败，请稍后再试');
+        } finally {
+          setLoading(deleteAccountBtn, false);
+        }
+      }
+
+      deleteAccountBtn.addEventListener('click', handleDeleteAccount);
+
+      // ============================================================
+      // 10. 会话保持
       // ============================================================
       (async function checkSession() {
         try {
