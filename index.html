@@ -641,8 +641,9 @@
             var item = document.createElement('div');
             item.className = 'email-suggest-item';
             item.dataset.domain = d;
-            // 高亮输入的部分
-            item.innerHTML = '<span class="domain">' + typed + '</span>' + d.slice(typed.length);
+            // 显示：用户输入的前缀 + @ + 域名
+            var prefix = input.value.slice(0, input.value.lastIndexOf('@'));
+            item.innerHTML = prefix + '<span class="domain">@' + d + '</span>';
             item.addEventListener('mousedown', function (e) {
               e.preventDefault(); // 防止 input 失焦
               pick(d);
@@ -663,15 +664,32 @@
           panel.innerHTML = '';
           activeIndex = -1;
           input.focus();
-          // 触发 input 事件，让 registerMessage 清空
-          input.dispatchEvent(new Event('input'));
+          // 手动清空注册消息，避免重新触发 render()
+          if (typeof clearMessage === 'function' && typeof registerMessage !== 'undefined' && registerMessage) {
+            clearMessage(registerMessage);
+          }
         }
 
         // 输入时实时过滤
         input.addEventListener('input', render);
 
-        // 聚焦时，如果已经有 @，也显示
-        input.addEventListener('focus', render);
+        // 聚焦时：只有当输入里包含 @ 且 @ 后面还有内容时才显示（且不能是完整域名）
+        input.addEventListener('focus', function () {
+          var v = input.value;
+          var at = v.lastIndexOf('@');
+          if (at < 0) return;
+          var tail = v.slice(at + 1);
+          // 如果 @ 后面没内容，或内容是完整域名，就不弹
+          if (tail.length === 0) {
+            render(); // 输入 @ 后面为空时仍然弹（让用户挑默认 5 个）
+            return;
+          }
+          // 如果 tail 已经是完整的某个域名，就不弹
+          if (ALLOWED_DOMAINS.indexOf(tail.toLowerCase()) !== -1) {
+            return;
+          }
+          render();
+        });
 
         // 键盘上下 + 回车选择
         input.addEventListener('keydown', function (e) {
