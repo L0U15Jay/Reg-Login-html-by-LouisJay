@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>云登录 · 简易注册</title>
+  <style>
+    /* 全局重置与字体 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(145deg, #0b1a2e 0%, #1b2f44 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    /* 主卡片容器 — 玻璃拟态风格 */
+    .auth-card {
+      background: rgba(255, 255, 255, 0.07);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 2rem;
+      box-shadow: 0 30px 50px -20px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+      width: 100%;
+      max-width: 440px;
+      padding: 2.5rem 2rem;
+      transition: all 0.3s ease;
+    }
+
+    /* 选项卡切换 */
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 3rem;
+      padding: 0.35rem;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 0.85rem 0.5rem;
+      border: none;
+      background: transparent;
+      color: #a0b8d0;
+      font-weight: 600;
+      font-size: 1rem;
+      border-radius: 2.5rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: 0.3px;
+    }
+
+    .tab-btn.active {
+      background: #ffffff;
+      color: #0b1a2e;
+      box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.6);
+    }
+
+    .tab-btn:not(.active):hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #e0edff;
+    }
+
+    /* 表单面板 */
+    .form-panel {
+      display: none;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .form-panel.active {
+      display: flex;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .input-group label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #b0c8e0;
+      margin-left: 0.5rem;
+    }
+
+    .input-group input {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1.5px solid rgba(255, 255, 255, 0.08);
+      border-radius: 1.25rem;
+      padding: 1rem 1.25rem;
+      font-size: 1rem;
+      color: #ffffff;
+      outline: none;
+      transition: all 0.2s ease;
+      width: 100%;
+    }
+
+    .input-group input::placeholder {
+      color: #6e8aa8;
+      font-weight: 400;
+      font-size: 0.95rem;
+    }
+
+    .input-group input:focus {
+      border-color: #4f9cf7;
+      background: rgba(10, 30, 50, 0.8);
+      box-shadow: 0 0 0 4px rgba(79, 156, 247, 0.15);
+    }
+
+    /* 按钮 */
+    .btn-primary {
+      background: linear-gradient(135deg, #4f9cf7, #2d6fdb);
+      border: none;
+      padding: 1.1rem 1.5rem;
+      border-radius: 2rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: white;
+      cursor: pointer;
+      transition: 0.15s ease;
+      box-shadow: 0 12px 20px -12px #0b1a2e, 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+      margin-top: 0.25rem;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #62abff, #3c7eec);
+      transform: scale(1.01);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+      box-shadow: 0 6px 12px -8px #000;
+    }
+
+    /* 消息提示 */
+    .message {
+      min-height: 2rem;
+      font-size: 0.9rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 0.1rem;
+      line-height: 1.4;
+      transition: all 0.2s;
+    }
+
+    .message.error {
+      color: #ffb0b0;
+      background: rgba(220, 38, 38, 0.18);
+      border-left: 4px solid #f87171;
+    }
+
+    .message.success {
+      color: #b0f0c0;
+      background: rgba(34, 197, 94, 0.15);
+      border-left: 4px solid #4ade80;
+    }
+
+    /* 辅助切换链接 */
+    .extra-hint {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #7f9ab8;
+      margin-top: 0.5rem;
+    }
+
+    .extra-hint span {
+      color: #6fb3ff;
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .extra-hint span:hover {
+      color: #a0d0ff;
+    }
+
+    /* 底部云端说明 */
+    .cloud-note {
+      margin-top: 2rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 1.2rem;
+      font-size: 0.75rem;
+      color: #5a7896;
+      text-align: center;
+      line-height: 1.6;
+      letter-spacing: 0.2px;
+    }
+
+    .cloud-note code {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 0.15rem 0.6rem;
+      border-radius: 1rem;
+      font-family: 'SF Mono', monospace;
+      font-size: 0.7rem;
+      color: #b0d0ff;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .badge-cloud {
+      display: inline-block;
+      background: rgba(79, 156, 247, 0.2);
+      border: 1px solid rgba(79, 156, 247, 0.3);
+      color: #9ac8ff;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.2rem 0.8rem;
+      border-radius: 3rem;
+      margin-right: 0.4rem;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <!-- 选项卡 -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tabLoginBtn" data-tab="login">登录</button>
+      <button class="tab-btn" id="tabRegisterBtn" data-tab="register">注册</button>
+    </div>
+
+    <!-- 登录面板 -->
+    <div class="form-panel active" id="loginPanel">
+      <div class="input-group">
+        <label for="loginUsername">账号</label>
+        <input type="text" id="loginUsername" placeholder="输入你的账号" autocomplete="username">
+      </div>
+      <div class="input-group">
+        <label for="loginPassword">密码</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="message" id="loginMessage"></div>
+      <button class="btn-primary" id="loginBtn">登录</button>
+      <div class="extra-hint">
+        还没有账号？<span id="switchToRegister">简易注册</span>
+      </div>
+    </div>
+
+    <!-- 注册面板 -->
+    <div class="form-panel" id="registerPanel">
+      <div class="input-group">
+        <label for="registerUsername">账号</label>
+        <input type="text" id="registerUsername" placeholder="设置账号（至少3位）" autocomplete="off">
+      </div>
+      <div class="input-group">
+        <label for="registerPassword">密码</label>
+        <input type="password" id="registerPassword" placeholder="设置密码（至少6位）" autocomplete="new-password">
+      </div>
+      <div class="input-group">
+        <label for="registerConfirm">确认密码</label>
+        <input type="password" id="registerConfirm" placeholder="再次输入密码" autocomplete="off">
+      </div>
+      <div class="message" id="registerMessage"></div>
+      <button class="btn-primary" id="registerBtn">注册</button>
+      <div class="extra-hint">
+        已有账号？<span id="switchToLogin">返回登录</span>
+      </div>
+    </div>
+
+    <!-- 云端存储说明 -->
+    <div class="cloud-note">
+      <span class="badge-cloud">☁️ 云端存储</span>
+      账号密码保存在浏览器云端（localStorage），
+      首次使用请先 <strong>简易注册</strong>。<br>
+      内置演示账号：<code>admin</code> / <code>123456</code>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      // ============================================================
+      // 云端存储模拟层 —— 基于 localStorage
+      // 描述：这个公开网站支持用户使用保存在云端的账号密码进行登录，
+      //      并且帮助第一次使用的新用户进行简易注册。
+      // ============================================================
+
+      const CLOUD_KEY = 'cloud_auth_users';
+
+      // 初始化云端默认账户（仅当云端无数据时）
+      function initCloud() {
+        const cloudData = localStorage.getItem(CLOUD_KEY);
+        if (!cloudData) {
+          // 首次使用：预置 admin / 123456，方便演示
+          const defaultUsers = {
+            'admin': '123456'
+          };
+          localStorage.setItem(CLOUD_KEY, JSON.stringify(defaultUsers));
+        }
+      }
+
+      // 读取云端所有用户 { username: password, ... }
+      function getCloudUsers() {
+        const raw = localStorage.getItem(CLOUD_KEY);
+        if (raw) {
+          try {
+            return JSON.parse(raw);
+          } catch (e) {
+            console.warn('云端数据解析异常，重置为默认账户。');
+            return { 'admin': '123456' };
+          }
+        }
+        return { 'admin': '123456' };
+      }
+
+      // 保存云端用户数据
+      function saveCloudUsers(users) {
+        localStorage.setItem(CLOUD_KEY, JSON.stringify(users));
+      }
+
+      // 检查用户是否已存在于云端
+      function cloudUserExists(username) {
+        const users = getCloudUsers();
+        return users.hasOwnProperty(username);
+      }
+
+      // 云端注册新用户：成功返回 true，已存在返回 false
+      function cloudRegister(username, password) {
+        const users = getCloudUsers();
+        if (users.hasOwnProperty(username)) {
+          return false;
+        }
+        users[username] = password;
+        saveCloudUsers(users);
+        return true;
+      }
+
+      // 云端登录验证：成功返回 true
+      function cloudLogin(username, password) {
+        const users = getCloudUsers();
+        return users.hasOwnProperty(username) && users[username] === password;
+      }
+
+      // ---------- 初始化云端数据 ----------
+      initCloud();
+
+      // ============================================================
+      // DOM 元素
+      // ============================================================
+      const tabLoginBtn = document.getElementById('tabLoginBtn');
+      const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+      const loginPanel = document.getElementById('loginPanel');
+      const registerPanel = document.getElementById('registerPanel');
+
+      // 登录表单
+      const loginUsername = document.getElementById('loginUsername');
+      const loginPassword = document.getElementById('loginPassword');
+      const loginBtn = document.getElementById('loginBtn');
+      const loginMessage = document.getElementById('loginMessage');
+
+      // 注册表单
+      const registerUsername = document.getElementById('registerUsername');
+      const registerPassword = document.getElementById('registerPassword');
+      const registerConfirm = document.getElementById('registerConfirm');
+      const registerBtn = document.getElementById('registerBtn');
+      const registerMessage = document.getElementById('registerMessage');
+
+      // 切换链接
+      const switchToRegister = document.getElementById('switchToRegister');
+      const switchToLogin = document.getElementById('switchToLogin');
+
+      // ============================================================
+      // 工具函数
+      // ============================================================
+      function setMessage(el, text, type = 'error') {
+        el.textContent = text;
+        el.className = 'message';
+        if (text) {
+          el.classList.add(type);
+        }
+      }
+
+      function clearMessage(el) {
+        el.textContent = '';
+        el.className = 'message';
+      }
+
+      // 切换选项卡
+      function switchTab(tab) {
+        clearMessage(loginMessage);
+        clearMessage(registerMessage);
+
+        if (tab === 'login') {
+          tabLoginBtn.classList.add('active');
+          tabRegisterBtn.classList.remove('active');
+          loginPanel.classList.add('active');
+          registerPanel.classList.remove('active');
+        } else {
+          tabRegisterBtn.classList.add('active');
+          tabLoginBtn.classList.remove('active');
+          registerPanel.classList.add('active');
+          loginPanel.classList.remove('active');
+        }
+      }
+
+      // ============================================================
+      // 登录逻辑 —— 使用云端账号密码
+      // ============================================================
+      function handleLogin() {
+        const username = loginUsername.value.trim();
+        const password = loginPassword.value;
+
+        if (!username) {
+          setMessage(loginMessage, '⚠️ 请输入账号', 'error');
+          return;
+        }
+        if (!password) {
+          setMessage(loginMessage, '⚠️ 请输入密码', 'error');
+          return;
+        }
+
+        // 核心：云端验证
+        if (cloudLogin(username, password)) {
+          setMessage(loginMessage, `✅ 登录成功！云端验证通过，欢迎 ${username}`, 'success');
+          // 实际项目可跳转，这里仅提示
+          // 清空密码输入框（安全习惯）
+          loginPassword.value = '';
+        } else {
+          setMessage(loginMessage, '❌ 账号或密码错误，请检查云端凭据', 'error');
+        }
+      }
+
+      loginBtn.addEventListener('click', handleLogin);
+
+      loginPassword.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleLogin();
+        }
+      });
+      loginUsername.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          loginPassword.focus();
+        }
+      });
+
+      // 输入时清除旧消息
+      loginUsername.addEventListener('input', () => clearMessage(loginMessage));
+      loginPassword.addEventListener('input', () => clearMessage(loginMessage));
+
+      // ============================================================
+      // 注册逻辑 —— 简易注册，云端保存
+      // ============================================================
+      function handleRegister() {
+        const username = registerUsername.value.trim();
+        const password = registerPassword.value;
+        const confirm = registerConfirm.value;
+
+        // 校验
+        if (!username) {
+          setMessage(registerMessage, '⚠️ 请输入账号', 'error');
+          return;
+        }
+        if (!password) {
+          setMessage(registerMessage, '⚠️ 请输入密码', 'error');
+          return;
+        }
+        if (!confirm) {
+          setMessage(registerMessage, '⚠️ 请确认密码', 'error');
+          return;
+        }
+
+        if (username.length < 3) {
+          setMessage(registerMessage, '⚠️ 账号长度至少3位', 'error');
+          return;
+        }
+        if (password.length < 6) {
+          setMessage(registerMessage, '⚠️ 密码长度至少6位', 'error');
+          return;
+        }
+        if (password !== confirm) {
+          setMessage(registerMessage, '⚠️ 两次输入的密码不一致', 'error');
+          return;
+        }
+
+        // 检查云端是否已存在
+        if (cloudUserExists(username)) {
+          setMessage(registerMessage, `❌ 账号 "${username}" 已在云端注册`, 'error');
+          return;
+        }
+
+        // 云端注册
+        const success = cloudRegister(username, password);
+        if (success) {
+          setMessage(registerMessage, `✅ 注册成功！云端已保存，即将跳转登录…`, 'success');
+
+          // 注册成功后：跳转登录面板并填充账号
+          setTimeout(() => {
+            switchTab('login');
+            loginUsername.value = username;
+            loginPassword.value = '';
+            loginPassword.focus();
+
+            // 清空注册表单
+            registerUsername.value = '';
+            registerPassword.value = '';
+            registerConfirm.value = '';
+            clearMessage(registerMessage);
+
+            // 在登录消息区显示友好提示
+            setMessage(loginMessage, `✨ 账号 ${username} 注册成功，请输入密码登录`, 'success');
+            setTimeout(() => {
+              if (loginMessage.textContent.includes('注册成功')) {
+                clearMessage(loginMessage);
+              }
+            }, 4000);
+          }, 800);
+        } else {
+          setMessage(registerMessage, '❌ 注册失败，请稍后重试', 'error');
+        }
+      }
+
+      registerBtn.addEventListener('click', handleRegister);
+
+      registerConfirm.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleRegister();
+        }
+      });
+      registerPassword.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          registerConfirm.focus();
+        }
+      });
+      registerUsername.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          registerPassword.focus();
+        }
+      });
+
+      // 输入时清除旧消息
+      registerUsername.addEventListener('input', () => clearMessage(registerMessage));
+      registerPassword.addEventListener('input', () => clearMessage(registerMessage));
+      registerConfirm.addEventListener('input', () => clearMessage(registerMessage));
+
+      // ============================================================
+      // 选项卡切换绑定
+      // ============================================================
+      tabLoginBtn.addEventListener('click', () => switchTab('login'));
+      tabRegisterBtn.addEventListener('click', () => switchTab('register'));
+      switchToRegister.addEventListener('click', () => switchTab('register'));
+      switchToLogin.addEventListener('click', () => switchTab('login'));
+
+      // 页面加载时确保状态正确（默认登录激活）
+      switchTab('login');
+    })();
+  </script>
+</body>
+</html>
