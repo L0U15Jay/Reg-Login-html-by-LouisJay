@@ -436,10 +436,53 @@
       margin-right: 6px;
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  </style>
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* ========== 邮箱域名下拉框 ========== */
+      .email-input-wrap {
+        position: relative;
+      }
+      .email-suggest {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        background: #14263a;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 1rem;
+        box-shadow: 0 20px 40px -16px rgba(0, 0, 0, 0.8);
+        padding: 0.35rem;
+        max-height: 260px;
+        overflow-y: auto;
+        z-index: 100;
+        display: none;
+      }
+      .email-suggest.show {
+        display: block;
+      }
+      .email-suggest-item {
+        padding: 0.6rem 0.85rem;
+        border-radius: 0.75rem;
+        font-size: 0.92rem;
+        color: #c0d4e8;
+        cursor: pointer;
+        transition: background 0.12s ease;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .email-suggest-item:hover,
+      .email-suggest-item.active {
+        background: rgba(79, 156, 247, 0.18);
+        color: #ffffff;
+      }
+      .email-suggest-item .domain {
+        color: #6fb3ff;
+        font-weight: 600;
+      }
+    </style>
 </head>
 <body>
   <div class="auth-card">
@@ -475,8 +518,10 @@
         </div>
         <div class="input-group">
           <label for="registerEmail">邮箱</label>
-          <input type="email" id="registerEmail" placeholder="you@example.com（仅作账号标识）" autocomplete="email" list="emailDomains">
-          <datalist id="emailDomains"></datalist>
+          <div class="email-input-wrap">
+            <input type="email" id="registerEmail" placeholder="you@example.com（仅作账号标识）" autocomplete="email" autocomplete="off">
+            <div class="email-suggest" id="emailSuggest"></div>
+          </div>
         </div>
         <div class="input-group">
           <label for="registerPassword">密码</label>
@@ -552,15 +597,118 @@
       // ============================================================
       var ALLOWED_DOMAINS = [];
 
-      // 把 ALLOWED_DOMAINS 填到 <datalist id="emailDomains">
-      function fillEmailDatalist() {
-        var datalist = document.getElementById('emailDomains');
-        if (!datalist) return;
-        datalist.innerHTML = '';
-        ALLOWED_DOMAINS.forEach(function (d) {
-          var opt = document.createElement('option');
-          opt.value = d;
-          datalist.appendChild(opt);
+      // 初始化邮箱下拉框（自动补全 + 实时过滤）
+      function initEmailSuggest() {
+        var input = document.getElementById('registerEmail');
+        var panel = document.getElementById('emailSuggest');
+        if (!input || !panel) return;
+
+        var activeIndex = -1;
+
+        // 从输入框的值中解析出 @ 后面的部分
+        function getTypedDomain() {
+          var v = input.value;
+          var at = v.lastIndexOf('@');
+          if (at < 0) return null;
+          return v.slice(at + 1).toLowerCase();
+        }
+
+        // 渲染下拉列表
+        function render() {
+          var typed = getTypedDomain();
+          if (typed === null) {
+            // 还没输入 @，不显示
+            panel.classList.remove('show');
+            panel.innerHTML = '';
+            activeIndex = -1;
+            return;
+          }
+
+          // 过滤：域名以 typed 开头的
+          var matches = ALLOWED_DOMAINS.filter(function (d) {
+            return d.indexOf(typed) === 0;
+          }).slice(0, 8);
+
+          if (matches.length === 0) {
+            panel.classList.remove('show');
+            panel.innerHTML = '';
+            activeIndex = -1;
+            return;
+          }
+
+          panel.innerHTML = '';
+          matches.forEach(function (d, i) {
+            var item = document.createElement('div');
+            item.className = 'email-suggest-item';
+            item.dataset.domain = d;
+            // 高亮输入的部分
+            item.innerHTML = '<span class="domain">' + typed + '</span>' + d.slice(typed.length);
+            item.addEventListener('mousedown', function (e) {
+              e.preventDefault(); // 防止 input 失焦
+              pick(d);
+            });
+            panel.appendChild(item);
+          });
+
+          panel.classList.add('show');
+          activeIndex = -1;
+        }
+
+        // 选择一个域名，补全输入框
+        function pick(domain) {
+          var v = input.value;
+          var at = v.lastIndexOf('@');
+          input.value = v.slice(0, at + 1) + domain;
+          panel.classList.remove('show');
+          panel.innerHTML = '';
+          activeIndex = -1;
+          input.focus();
+          // 触发 input 事件，让 registerMessage 清空
+          input.dispatchEvent(new Event('input'));
+        }
+
+        // 输入时实时过滤
+        input.addEventListener('input', render);
+
+        // 聚焦时，如果已经有 @，也显示
+        input.addEventListener('focus', render);
+
+        // 键盘上下 + 回车选择
+        input.addEventListener('keydown', function (e) {
+          var items = panel.querySelectorAll('.email-suggest-item');
+          if (!panel.classList.contains('show') || items.length === 0) return;
+
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            activeIndex = (activeIndex + 1) % items.length;
+            updateActive(items);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            activeIndex = (activeIndex - 1 + items.length) % items.length;
+            updateActive(items);
+          } else if (e.key === 'Enter') {
+            if (activeIndex >= 0 && items[activeIndex]) {
+              e.preventDefault();
+              pick(items[activeIndex].dataset.domain);
+            }
+          } else if (e.key === 'Escape') {
+            panel.classList.remove('show');
+            activeIndex = -1;
+          }
+        });
+
+        function updateActive(items) {
+          items.forEach(function (it, i) {
+            it.classList.toggle('active', i === activeIndex);
+          });
+        }
+
+        // 点击其他区域关闭
+        document.addEventListener('click', function (e) {
+          if (!input.contains(e.target) && !panel.contains(e.target)) {
+            panel.classList.remove('show');
+            activeIndex = -1;
+          }
         });
       }
 
@@ -585,13 +733,15 @@
             'yahoo.com', 'icloud.com', 'foxmail.com', '126.com'
           ];
         }
-        fillEmailDatalist();
+        // 数据加载完成后，初始化下拉框
+        initEmailSuggest();
       }
 
       // 等 DOM 就绪后再加载
       document.addEventListener('DOMContentLoaded', function () {
         loadAllowedDomains();
       });
+      
       const SUPABASE_URL = 'https://eweempozqecmbxtibypr.supabase.co';
       const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_f2p71KCimQeuF2m_MOL34A_k71bT_WV';
 
