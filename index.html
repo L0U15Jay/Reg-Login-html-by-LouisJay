@@ -261,7 +261,6 @@
       border-color: rgba(248, 113, 113, 0.5);
     }
 
-    /* 注销账号按钮 */
     .btn-delete {
       background: rgba(220, 38, 38, 0.15);
       border: 1px solid rgba(248, 113, 113, 0.4);
@@ -289,8 +288,8 @@
       cursor: not-allowed;
     }
 
-    /* 自定义确认弹窗 */
-    .confirm-overlay {
+    /* ========== 统一弹窗 ========== */
+    .modal-overlay {
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.7);
@@ -305,11 +304,11 @@
       transition: opacity 0.2s ease;
       padding: 1.5rem;
     }
-    .confirm-overlay.show {
+    .modal-overlay.show {
       opacity: 1;
       pointer-events: auto;
     }
-    .confirm-box {
+    .modal-box {
       background: #1a2b3f;
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 1.5rem;
@@ -320,39 +319,46 @@
       transform: scale(0.95);
       transition: transform 0.2s ease;
     }
-    .confirm-overlay.show .confirm-box {
+    .modal-overlay.show .modal-box {
       transform: scale(1);
     }
-    .confirm-icon {
+    .modal-icon {
       width: 56px;
       height: 56px;
       border-radius: 50%;
-      background: rgba(220, 38, 38, 0.2);
       display: flex;
       align-items: center;
       justify-content: center;
       margin: 0 auto 1rem;
       font-size: 1.8rem;
     }
-    .confirm-title {
+    .modal-icon.danger {
+      background: rgba(220, 38, 38, 0.2);
+    }
+    .modal-icon.success {
+      background: rgba(34, 197, 94, 0.2);
+    }
+    .modal-title {
       text-align: center;
       font-size: 1.2rem;
       font-weight: 700;
-      color: #ff8a8a;
       margin-bottom: 0.75rem;
     }
-    .confirm-desc {
+    .modal-title.danger { color: #ff8a8a; }
+    .modal-title.success { color: #86efac; }
+    .modal-desc {
       text-align: center;
       font-size: 0.9rem;
       color: #a0b8d0;
       line-height: 1.6;
       margin-bottom: 1.5rem;
+      white-space: pre-line;
     }
-    .confirm-actions {
+    .modal-actions {
       display: flex;
       gap: 0.75rem;
     }
-    .confirm-actions button {
+    .modal-actions button {
       flex: 1;
       padding: 0.85rem;
       border-radius: 1.25rem;
@@ -382,6 +388,15 @@
     .btn-danger:disabled {
       opacity: 0.6;
       cursor: not-allowed;
+    }
+    .btn-confirm {
+      background: linear-gradient(135deg, #4f9cf7, #2d6fdb);
+      color: white;
+      box-shadow: 0 8px 16px -8px rgba(79, 156, 247, 0.6);
+    }
+    .btn-confirm:hover {
+      background: linear-gradient(135deg, #62abff, #3c7eec);
+      transform: scale(1.02);
     }
 
     .cloud-note {
@@ -497,18 +512,29 @@
     </div>
   </div>
 
-  <!-- 自定义确认弹窗 -->
-  <div class="confirm-overlay" id="confirmOverlay">
-    <div class="confirm-box">
-      <div class="confirm-icon">⚠️</div>
-      <div class="confirm-title">永久注销账号？</div>
-      <div class="confirm-desc">
-        此操作不可撤销。<br>
-        你的邮箱将被释放，之后可以用同一邮箱重新注册。
+  <!-- 统一弹窗：确认注销 -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-box">
+      <div class="modal-icon danger">⚠️</div>
+      <div class="modal-title danger">永久注销账号？</div>
+      <div class="modal-desc">
+        此操作不可撤销。你的邮箱将被释放，之后可以用同一邮箱重新注册。
       </div>
-      <div class="confirm-actions">
+      <div class="modal-actions">
         <button class="btn-cancel" id="confirmCancel">取消</button>
         <button class="btn-danger" id="confirmDelete">确认永久删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 统一弹窗：消息提示 -->
+  <div class="modal-overlay" id="messageModal">
+    <div class="modal-box">
+      <div class="modal-icon" id="messageModalIcon">ℹ️</div>
+      <div class="modal-title" id="messageModalTitle">提示</div>
+      <div class="modal-desc" id="messageModalDesc"></div>
+      <div class="modal-actions">
+        <button class="btn-confirm" id="messageModalOk">确定</button>
       </div>
     </div>
   </div>
@@ -561,9 +587,17 @@
       const logoutBtn = document.getElementById('logoutBtn');
       const deleteAccountBtn = document.getElementById('deleteAccountBtn');
 
-      const confirmOverlay = document.getElementById('confirmOverlay');
+      // 确认弹窗
+      const confirmModal = document.getElementById('confirmModal');
       const confirmCancel = document.getElementById('confirmCancel');
       const confirmDelete = document.getElementById('confirmDelete');
+
+      // 消息弹窗
+      const messageModal = document.getElementById('messageModal');
+      const messageModalIcon = document.getElementById('messageModalIcon');
+      const messageModalTitle = document.getElementById('messageModalTitle');
+      const messageModalDesc = document.getElementById('messageModalDesc');
+      const messageModalOk = document.getElementById('messageModalOk');
 
       function setMessage(el, text, type = 'error') {
         el.textContent = text;
@@ -612,6 +646,41 @@
         return '❌ ' + message;
       }
 
+      // ============================================================
+      // 统一消息弹窗
+      // ============================================================
+      function showModalMessage(title, desc, type = 'info') {
+        // type: 'info' | 'success' | 'danger'
+        if (type === 'success') {
+          messageModalIcon.textContent = '✅';
+          messageModalIcon.className = 'modal-icon success';
+          messageModalTitle.className = 'modal-title success';
+        } else if (type === 'danger') {
+          messageModalIcon.textContent = '⚠️';
+          messageModalIcon.className = 'modal-icon danger';
+          messageModalTitle.className = 'modal-title danger';
+        } else {
+          messageModalIcon.textContent = 'ℹ️';
+          messageModalIcon.className = 'modal-icon';
+          messageModalTitle.className = 'modal-title';
+        }
+        messageModalTitle.textContent = title;
+        messageModalDesc.textContent = desc;
+        messageModal.classList.add('show');
+      }
+
+      function closeModalMessage() {
+        messageModal.classList.remove('show');
+      }
+
+      messageModalOk.addEventListener('click', closeModalMessage);
+      messageModal.addEventListener('click', (e) => {
+        if (e.target === messageModal) closeModalMessage();
+      });
+
+      // ============================================================
+      // 429 限流冷却
+      // ============================================================
       const cooldownState = {
         register: { until: 0, timer: null },
         login:    { until: 0, timer: null }
@@ -673,6 +742,9 @@
         el.addEventListener('input', () => clearMessage(registerMessage))
       );
 
+      // ============================================================
+      // 注册
+      // ============================================================
       async function handleRegister() {
         if (isCoolingDown('register')) {
           setMessage(registerMessage, '⚠️ 操作太频繁，请等待冷却结束', 'warning');
@@ -763,6 +835,9 @@
         if (e.key === 'Enter') { e.preventDefault(); registerConfirm.focus(); }
       });
 
+      // ============================================================
+      // 登录
+      // ============================================================
       async function handleLogin() {
         if (isCoolingDown('login')) {
           setMessage(loginMessage, '⚠️ 操作太频繁，请等待冷却结束', 'warning');
@@ -822,6 +897,9 @@
         if (e.key === 'Enter') { e.preventDefault(); loginPassword.focus(); }
       });
 
+      // ============================================================
+      // 登录后视图 & 登出
+      // ============================================================
       function showWelcome(user) {
         if (!user) return;
 
@@ -863,97 +941,15 @@
 
       logoutBtn.addEventListener('click', handleLogout);
 
+      // ============================================================
+      // 注销账号
+      // ============================================================
       function openConfirmDialog() {
-        confirmOverlay.classList.add('show');
+        confirmModal.classList.add('show');
       }
 
       function closeConfirmDialog() {
-        confirmOverlay.classList.remove('show');
+        confirmModal.classList.remove('show');
       }
 
-      confirmCancel.addEventListener('click', closeConfirmDialog);
-      confirmOverlay.addEventListener('click', (e) => {
-        if (e.target === confirmOverlay) closeConfirmDialog();
-      });
-
-      async function doDeleteAccount() {
-        confirmDelete.disabled = true;
-        confirmDelete.textContent = '删除中…';
-        confirmCancel.disabled = true;
-
-        try {
-          const { data: { session } } = await supabaseClient.auth.getSession();
-          if (!session) {
-            alert('会话已过期，请重新登录');
-            closeConfirmDialog();
-            hideWelcome();
-            return;
-          }
-
-          const response = await fetch(
-            `${SUPABASE_URL}/functions/v1/delete-user`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'apikey': SUPABASE_PUBLISHABLE_KEY,
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-
-          const result = await response.json().catch(() => ({}));
-
-          if (!response.ok) {
-            console.error('删除失败:', result);
-            alert('删除失败：' + (result.error || `HTTP ${response.status}`));
-            return;
-          }
-
-          closeConfirmDialog();
-          await supabaseClient.auth.signOut();
-          hideWelcome();
-
-          setTimeout(() => {
-            alert('✅ 账号已永久删除\n\n你的邮箱现在可以重新注册了。');
-          }, 200);
-        } catch (err) {
-          console.error('注销异常:', err);
-          alert('注销失败，请稍后再试');
-        } finally {
-          confirmDelete.disabled = false;
-          confirmDelete.textContent = '确认永久删除';
-          confirmCancel.disabled = false;
-        }
-      }
-
-      confirmDelete.addEventListener('click', doDeleteAccount);
-      deleteAccountBtn.addEventListener('click', openConfirmDialog);
-
-      (async function checkSession() {
-        try {
-          const { data, error } = await supabaseClient.auth.getSession();
-          if (error) {
-            console.warn('获取会话失败:', error.message);
-            return;
-          }
-          if (data && data.session && data.session.user) {
-            showWelcome(data.session.user);
-          }
-        } catch (err) {
-          console.error('检查会话异常:', err);
-        }
-      })();
-
-      supabaseClient.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_OUT') {
-          hideWelcome();
-        } else if (event === 'SIGNED_IN' && session && session.user) {
-          showWelcome(session.user);
-        }
-      });
-
-    })();
-  </script>
-</body>
-</html>
+      confirmCancel
