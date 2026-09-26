@@ -475,7 +475,8 @@
         </div>
         <div class="input-group">
           <label for="registerEmail">邮箱</label>
-          <input type="email" id="registerEmail" placeholder="you@example.com（仅作账号标识）" autocomplete="email">
+          <input type="email" id="registerEmail" placeholder="you@example.com（仅作账号标识）" autocomplete="email" list="emailDomains">
+          <datalist id="emailDomains"></datalist>
         </div>
         <div class="input-group">
           <label for="registerPassword">密码</label>
@@ -546,6 +547,51 @@
     (function () {
       'use strict';
 
+      // ============================================================
+      // 0. 加载邮箱白名单（从 /Inf/emails.json）
+      // ============================================================
+      var ALLOWED_DOMAINS = [];
+
+      // 把 ALLOWED_DOMAINS 填到 <datalist id="emailDomains">
+      function fillEmailDatalist() {
+        var datalist = document.getElementById('emailDomains');
+        if (!datalist) return;
+        datalist.innerHTML = '';
+        ALLOWED_DOMAINS.forEach(function (d) {
+          var opt = document.createElement('option');
+          opt.value = d;
+          datalist.appendChild(opt);
+        });
+      }
+
+      // 同步读取 Inf/emails.json
+      function loadAllowedDomains() {
+        try {
+          var xhr = new XMLHttpRequest();
+          xhr.open('GET', 'Inf/emails.json', false);
+          xhr.send(null);
+          if (xhr.status === 200 || xhr.status === 0) {
+            var data = JSON.parse(xhr.responseText);
+            if (data && Array.isArray(data.domains)) {
+              ALLOWED_DOMAINS = data.domains.map(function (d) {
+                return String(d).toLowerCase().trim();
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('加载 Inf/emails.json 失败，将使用内置后备列表。', e);
+          ALLOWED_DOMAINS = [
+            'gmail.com', 'qq.com', '163.com', 'outlook.com', 'hotmail.com',
+            'yahoo.com', 'icloud.com', 'foxmail.com', '126.com'
+          ];
+        }
+        fillEmailDatalist();
+      }
+
+      // 等 DOM 就绪后再加载
+      document.addEventListener('DOMContentLoaded', function () {
+        loadAllowedDomains();
+      });
       const SUPABASE_URL = 'https://eweempozqecmbxtibypr.supabase.co';
       const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_f2p71KCimQeuF2m_MOL34A_k71bT_WV';
 
@@ -643,6 +689,15 @@
         if (msg.indexOf('user not found') !== -1) return '❌ 该邮箱未注册';
 
         return '❌ ' + message;
+      }
+      
+      // 校验邮箱域名是否在白名单里
+      function isAllowedDomain(email) {
+        var at = email.lastIndexOf('@');
+        if (at < 0) return false;
+        var domain = email.slice(at + 1).toLowerCase();
+        if (ALLOWED_DOMAINS.length === 0) return true;
+        return ALLOWED_DOMAINS.indexOf(domain) !== -1;
       }
 
       // ========== 统一消息弹窗 ==========
@@ -755,6 +810,9 @@
         if (username.length < 2) return setMessage(registerMessage, '⚠️ 用户名至少 2 位', 'error');
         if (!email) return setMessage(registerMessage, '⚠️ 请输入邮箱', 'error');
         if (!isValidEmail(email)) return setMessage(registerMessage, '⚠️ 邮箱格式不正确，请检查', 'error');
+        if (!isAllowedDomain(email)) {
+          return setMessage(registerMessage, '⚠️ 暂不支持该邮箱，请使用 Gmail、QQ、163、Outlook 等常用邮箱', 'error');
+        }
         if (!password) return setMessage(registerMessage, '⚠️ 请输入密码', 'error');
         if (password.length < 6) return setMessage(registerMessage, '⚠️ 密码至少 6 位', 'error');
         if (password !== confirm) return setMessage(registerMessage, '⚠️ 两次输入的密码不一致', 'error');
@@ -987,9 +1045,20 @@
           await supabaseClient.auth.signOut();
           hideWelcome();
 
+          // 清空所有输入框
+          registerUsername.value = '';
+          registerEmail.value = '';
+          registerPassword.value = '';
+          registerConfirm.value = '';
+          loginEmail.value = '';
+          loginPassword.value = '';
+          clearMessage(registerMessage);
+          clearMessage(loginMessage);
+
           setTimeout(function () {
-              showModalMessage('账号已永久删除', '', 'success');
+            showModalMessage('账号已永久删除', '', 'success');
           }, 200);
+          
         } catch (err) {
           console.error('注销异常:', err);
           closeConfirmDialog();
