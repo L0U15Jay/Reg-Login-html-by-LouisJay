@@ -587,19 +587,18 @@
       const logoutBtn = document.getElementById('logoutBtn');
       const deleteAccountBtn = document.getElementById('deleteAccountBtn');
 
-      // 确认弹窗
       const confirmModal = document.getElementById('confirmModal');
       const confirmCancel = document.getElementById('confirmCancel');
       const confirmDelete = document.getElementById('confirmDelete');
 
-      // 消息弹窗
       const messageModal = document.getElementById('messageModal');
       const messageModalIcon = document.getElementById('messageModalIcon');
       const messageModalTitle = document.getElementById('messageModalTitle');
       const messageModalDesc = document.getElementById('messageModalDesc');
       const messageModalOk = document.getElementById('messageModalOk');
 
-      function setMessage(el, text, type = 'error') {
+      function setMessage(el, text, type) {
+        type = type || 'error';
         el.textContent = text;
         el.className = 'message';
         if (text) el.classList.add(type);
@@ -629,28 +628,26 @@
 
       function translateAuthError(message) {
         if (!message) return '操作失败，请重试';
-        const msg = message.toLowerCase();
+        var msg = message.toLowerCase();
 
-        if (msg.includes('invalid login credentials')) return '❌ 邮箱或密码错误';
-        if (msg.includes('user already registered')) return '❌ 该邮箱已被注册';
-        if (msg.includes('email not confirmed')) return '⚠️ 邮箱未验证，请检查邮箱';
-        if (msg.includes('password should be at least')) return '⚠️ 密码长度至少 6 位';
-        if (msg.includes('unable to validate email')) return '⚠️ 邮箱格式不正确';
-        if (msg.includes('email address') && msg.includes('invalid')) return '⚠️ 邮箱格式不正确';
-        if (msg.includes('rate limit') || msg.includes('too many requests') || msg.includes('after')) {
+        if (msg.indexOf('invalid login credentials') !== -1) return '❌ 邮箱或密码错误';
+        if (msg.indexOf('user already registered') !== -1) return '❌ 该邮箱已被注册';
+        if (msg.indexOf('email not confirmed') !== -1) return '⚠️ 邮箱未验证，请检查邮箱';
+        if (msg.indexOf('password should be at least') !== -1) return '⚠️ 密码长度至少 6 位';
+        if (msg.indexOf('unable to validate email') !== -1) return '⚠️ 邮箱格式不正确';
+        if (msg.indexOf('email address') !== -1 && msg.indexOf('invalid') !== -1) return '⚠️ 邮箱格式不正确';
+        if (msg.indexOf('rate limit') !== -1 || msg.indexOf('too many requests') !== -1 || msg.indexOf('after') !== -1) {
           return '⚠️ 操作太频繁，请稍后再试';
         }
-        if (msg.includes('network')) return '⚠️ 网络异常，请检查网络连接';
-        if (msg.includes('user not found')) return '❌ 该邮箱未注册';
+        if (msg.indexOf('network') !== -1) return '⚠️ 网络异常，请检查网络连接';
+        if (msg.indexOf('user not found') !== -1) return '❌ 该邮箱未注册';
 
         return '❌ ' + message;
       }
 
-      // ============================================================
-      // 统一消息弹窗
-      // ============================================================
-      function showModalMessage(title, desc, type = 'info') {
-        // type: 'info' | 'success' | 'danger'
+      // ========== 统一消息弹窗 ==========
+      function showModalMessage(title, desc, type) {
+        type = type || 'info';
         if (type === 'success') {
           messageModalIcon.textContent = '✅';
           messageModalIcon.className = 'modal-icon success';
@@ -674,25 +671,23 @@
       }
 
       messageModalOk.addEventListener('click', closeModalMessage);
-      messageModal.addEventListener('click', (e) => {
+      messageModal.addEventListener('click', function (e) {
         if (e.target === messageModal) closeModalMessage();
       });
 
-      // ============================================================
-      // 429 限流冷却
-      // ============================================================
-      const cooldownState = {
+      // ========== 429 限流冷却 ==========
+      var cooldownState = {
         register: { until: 0, timer: null },
         login:    { until: 0, timer: null }
       };
 
       function startCooldown(key, seconds, btn, msgEl, label) {
-        const state = cooldownState[key];
+        var state = cooldownState[key];
         if (state.timer) clearInterval(state.timer);
         state.until = Date.now() + seconds * 1000;
 
-        const tick = () => {
-          const remain = Math.ceil((state.until - Date.now()) / 1000);
+        var tick = function () {
+          var remain = Math.ceil((state.until - Date.now()) / 1000);
           if (remain <= 0) {
             clearInterval(state.timer);
             state.timer = null;
@@ -702,7 +697,7 @@
             return;
           }
           btn.disabled = true;
-          btn.innerHTML = `⏳ 请等待 ${remain}s`;
+          btn.innerHTML = '⏳ 请等待 ' + remain + 's';
         };
 
         tick();
@@ -713,6 +708,7 @@
         return Date.now() < cooldownState[key].until;
       }
 
+      // ========== 选项卡切换 ==========
       function switchTab(tab) {
         clearMessage(loginMessage);
         clearMessage(registerMessage);
@@ -730,31 +726,29 @@
         }
       }
 
-      tabLoginBtn.addEventListener('click', () => switchTab('login'));
-      tabRegisterBtn.addEventListener('click', () => switchTab('register'));
-      switchToRegister.addEventListener('click', () => switchTab('register'));
-      switchToLogin.addEventListener('click', () => switchTab('login'));
+      tabLoginBtn.addEventListener('click', function () { switchTab('login'); });
+      tabRegisterBtn.addEventListener('click', function () { switchTab('register'); });
+      switchToRegister.addEventListener('click', function () { switchTab('register'); });
+      switchToLogin.addEventListener('click', function () { switchTab('login'); });
 
-      [loginEmail, loginPassword].forEach(el =>
-        el.addEventListener('input', () => clearMessage(loginMessage))
-      );
-      [registerUsername, registerEmail, registerPassword, registerConfirm].forEach(el =>
-        el.addEventListener('input', () => clearMessage(registerMessage))
-      );
+      [loginEmail, loginPassword].forEach(function (el) {
+        el.addEventListener('input', function () { clearMessage(loginMessage); });
+      });
+      [registerUsername, registerEmail, registerPassword, registerConfirm].forEach(function (el) {
+        el.addEventListener('input', function () { clearMessage(registerMessage); });
+      });
 
-      // ============================================================
-      // 注册
-      // ============================================================
+      // ========== 注册 ==========
       async function handleRegister() {
         if (isCoolingDown('register')) {
           setMessage(registerMessage, '⚠️ 操作太频繁，请等待冷却结束', 'warning');
           return;
         }
 
-        const username = registerUsername.value.trim();
-        const email = registerEmail.value.trim();
-        const password = registerPassword.value;
-        const confirm = registerConfirm.value;
+        var username = registerUsername.value.trim();
+        var email = registerEmail.value.trim();
+        var password = registerPassword.value;
+        var confirm = registerConfirm.value;
 
         if (!username) return setMessage(registerMessage, '⚠️ 请输入用户名', 'error');
         if (username.length < 2) return setMessage(registerMessage, '⚠️ 用户名至少 2 位', 'error');
@@ -768,24 +762,24 @@
         clearMessage(registerMessage);
 
         try {
-          const { data, error } = await supabaseClient.auth.signUp({
+          var result = await supabaseClient.auth.signUp({
             email: email,
             password: password,
             options: {
               data: { username: username }
             }
           });
+          var data = result.data;
+          var error = result.error;
 
           if (error) {
-            const msg = error.message || '';
-            if (msg.toLowerCase().includes('after') ||
-                msg.toLowerCase().includes('rate limit') ||
-                msg.toLowerCase().includes('too many requests')) {
-              const match = msg.match(/after (\d+)/i);
-              const waitSeconds = match ? parseInt(match[1], 10) : 60;
-              setMessage(registerMessage,
-                `⚠️ 操作太频繁，需要等待 ${waitSeconds} 秒`,
-                'warning');
+            var msg = error.message || '';
+            if (msg.toLowerCase().indexOf('after') !== -1 ||
+                msg.toLowerCase().indexOf('rate limit') !== -1 ||
+                msg.toLowerCase().indexOf('too many requests') !== -1) {
+              var match = msg.match(/after (\d+)/i);
+              var waitSeconds = match ? parseInt(match[1], 10) : 60;
+              setMessage(registerMessage, '⚠️ 操作太频繁，需要等待 ' + waitSeconds + ' 秒', 'warning');
               startCooldown('register', waitSeconds, registerBtn, registerMessage, '注册');
               return;
             }
@@ -795,10 +789,10 @@
 
           if (data.session) {
             setMessage(registerMessage, '✅ 注册成功，正在进入…', 'success');
-            setTimeout(() => showWelcome(data.user), 600);
+            setTimeout(function () { showWelcome(data.user); }, 600);
           } else if (data.user && !data.session) {
             setMessage(registerMessage, '✅ 注册成功，请登录', 'success');
-            setTimeout(() => {
+            setTimeout(function () {
               switchTab('login');
               loginEmail.value = email;
               loginPassword.value = '';
@@ -822,30 +816,28 @@
       }
 
       registerBtn.addEventListener('click', handleRegister);
-      registerConfirm.addEventListener('keypress', e => {
+      registerConfirm.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') { e.preventDefault(); handleRegister(); }
       });
-      registerUsername.addEventListener('keypress', e => {
+      registerUsername.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') { e.preventDefault(); registerEmail.focus(); }
       });
-      registerEmail.addEventListener('keypress', e => {
+      registerEmail.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') { e.preventDefault(); registerPassword.focus(); }
       });
-      registerPassword.addEventListener('keypress', e => {
+      registerPassword.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') { e.preventDefault(); registerConfirm.focus(); }
       });
 
-      // ============================================================
-      // 登录
-      // ============================================================
+      // ========== 登录 ==========
       async function handleLogin() {
         if (isCoolingDown('login')) {
           setMessage(loginMessage, '⚠️ 操作太频繁，请等待冷却结束', 'warning');
           return;
         }
 
-        const email = loginEmail.value.trim();
-        const password = loginPassword.value;
+        var email = loginEmail.value.trim();
+        var password = loginPassword.value;
 
         if (!email) return setMessage(loginMessage, '⚠️ 请输入邮箱', 'error');
         if (!isValidEmail(email)) return setMessage(loginMessage, '⚠️ 邮箱格式不正确，请检查', 'error');
@@ -855,21 +847,21 @@
         clearMessage(loginMessage);
 
         try {
-          const { data, error } = await supabaseClient.auth.signInWithPassword({
+          var result = await supabaseClient.auth.signInWithPassword({
             email: email,
             password: password
           });
+          var data = result.data;
+          var error = result.error;
 
           if (error) {
-            const msg = error.message || '';
-            if (msg.toLowerCase().includes('after') ||
-                msg.toLowerCase().includes('rate limit') ||
-                msg.toLowerCase().includes('too many requests')) {
-              const match = msg.match(/after (\d+)/i);
-              const waitSeconds = match ? parseInt(match[1], 10) : 60;
-              setMessage(loginMessage,
-                `⚠️ 操作太频繁，需要等待 ${waitSeconds} 秒`,
-                'warning');
+            var msg = error.message || '';
+            if (msg.toLowerCase().indexOf('after') !== -1 ||
+                msg.toLowerCase().indexOf('rate limit') !== -1 ||
+                msg.toLowerCase().indexOf('too many requests') !== -1) {
+              var match = msg.match(/after (\d+)/i);
+              var waitSeconds = match ? parseInt(match[1], 10) : 60;
+              setMessage(loginMessage, '⚠️ 操作太频繁，需要等待 ' + waitSeconds + ' 秒', 'warning');
               startCooldown('login', waitSeconds, loginBtn, loginMessage, '登录');
               return;
             }
@@ -878,7 +870,7 @@
           }
 
           setMessage(loginMessage, '✅ 登录成功，正在进入…', 'success');
-          setTimeout(() => showWelcome(data.user), 600);
+          setTimeout(function () { showWelcome(data.user); }, 600);
         } catch (err) {
           console.error('登录异常:', err);
           setMessage(loginMessage, '❌ 登录失败，请稍后再试', 'error');
@@ -890,22 +882,20 @@
       }
 
       loginBtn.addEventListener('click', handleLogin);
-      loginPassword.addEventListener('keypress', e => {
+      loginPassword.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') { e.preventDefault(); handleLogin(); }
       });
-      loginEmail.addEventListener('keypress', e => {
+      loginEmail.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') { e.preventDefault(); loginPassword.focus(); }
       });
 
-      // ============================================================
-      // 登录后视图 & 登出
-      // ============================================================
+      // ========== 登录后视图 & 登出 ==========
       function showWelcome(user) {
         if (!user) return;
 
-        const username = (user.user_metadata && user.user_metadata.username) || '用户';
-        const email = user.email || '—';
-        const initial = username.trim().charAt(0).toUpperCase() || 'U';
+        var username = (user.user_metadata && user.user_metadata.username) || '用户';
+        var email = user.email || '—';
+        var initial = username.trim().charAt(0).toUpperCase() || 'U';
 
         welcomeAvatar.textContent = initial;
         welcomeTitle.textContent = '欢迎回来，' + username;
@@ -941,9 +931,7 @@
 
       logoutBtn.addEventListener('click', handleLogout);
 
-      // ============================================================
-      // 注销账号
-      // ============================================================
+      // ========== 注销账号 ==========
       function openConfirmDialog() {
         confirmModal.classList.add('show');
       }
@@ -952,4 +940,93 @@
         confirmModal.classList.remove('show');
       }
 
-      confirmCancel
+      confirmCancel.addEventListener('click', closeConfirmDialog);
+      confirmModal.addEventListener('click', function (e) {
+        if (e.target === confirmModal) closeConfirmDialog();
+      });
+
+      async function doDeleteAccount() {
+        confirmDelete.disabled = true;
+        confirmDelete.textContent = '删除中…';
+        confirmCancel.disabled = true;
+
+        try {
+          var sessionResult = await supabaseClient.auth.getSession();
+          var session = sessionResult.data.session;
+          if (!session) {
+            closeConfirmDialog();
+            hideWelcome();
+            showModalMessage('会话已过期', '请重新登录后再试。', 'danger');
+            return;
+          }
+
+          var response = await fetch(
+            SUPABASE_URL + '/functions/v1/delete-user',
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': 'Bearer ' + session.access_token,
+                'apikey': SUPABASE_PUBLISHABLE_KEY,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          var result = {};
+          try { result = await response.json(); } catch (e) {}
+
+          if (!response.ok) {
+            console.error('删除失败:', result);
+            closeConfirmDialog();
+            showModalMessage('删除失败', result.error || ('HTTP ' + response.status), 'danger');
+            return;
+          }
+
+          closeConfirmDialog();
+          await supabaseClient.auth.signOut();
+          hideWelcome();
+
+          setTimeout(function () {
+            showModalMessage('账号已永久删除', '你可以使用同一邮箱重新注册。', 'success');
+          }, 200);
+        } catch (err) {
+          console.error('注销异常:', err);
+          closeConfirmDialog();
+          showModalMessage('注销失败', '请稍后再试。', 'danger');
+        } finally {
+          confirmDelete.disabled = false;
+          confirmDelete.textContent = '确认永久删除';
+          confirmCancel.disabled = false;
+        }
+      }
+
+      confirmDelete.addEventListener('click', doDeleteAccount);
+      deleteAccountBtn.addEventListener('click', openConfirmDialog);
+
+      // ========== 会话保持 ==========
+      (async function checkSession() {
+        try {
+          var result = await supabaseClient.auth.getSession();
+          if (result.error) {
+            console.warn('获取会话失败:', result.error.message);
+            return;
+          }
+          if (result.data && result.data.session && result.data.session.user) {
+            showWelcome(result.data.session.user);
+          }
+        } catch (err) {
+          console.error('检查会话异常:', err);
+        }
+      })();
+
+      supabaseClient.auth.onAuthStateChange(function (event, session) {
+        if (event === 'SIGNED_OUT') {
+          hideWelcome();
+        } else if (event === 'SIGNED_IN' && session && session.user) {
+          showWelcome(session.user);
+        }
+      });
+
+    })();
+  </script>
+    
