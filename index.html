@@ -663,6 +663,7 @@
         }
         messageModalTitle.textContent = title;
         messageModalDesc.textContent = desc;
+        messageModalDesc.style.display = desc ? '' : 'none';
         messageModal.classList.add('show');
       }
 
@@ -987,7 +988,7 @@
           hideWelcome();
 
           setTimeout(function () {
-            showModalMessage('账号已永久删除', '你可以使用同一邮箱重新注册。', 'success');
+              showModalMessage('账号已永久删除', '', 'success');
           }, 200);
         } catch (err) {
           console.error('注销异常:', err);
